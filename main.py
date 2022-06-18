@@ -3,6 +3,8 @@ import argparse
 import numpy as np
 from smac.env import StarCraft2Env
 
+from qmix import QMix
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('map', type=str,
@@ -12,39 +14,63 @@ if __name__ == '__main__':
                                  'corridor', '6h_vs_8z', '2s_vs_1sc', 'so_many_baneling', 'bane_vs_bane',
                                  '2c_vs_64zg', ])
     parser.add_argument('--n_episodes', type=int, default=10, help='total episode num of training process')
+    parser.add_argument('--capacity', type=int, default=5e3, help='maximum number of episode in buffer')
+    parser.add_argument('--batch_size', type=int, default=100,
+                        help='number of episode sampled each time from buffer')
 
     args = parser.parse_args()
 
     env = StarCraft2Env(map_name=args.map)
     env_info = env.get_env_info()
+    state_dim = env_info["state_shape"]
+    obs_dim = env_info["obs_shape"]
+    action_dim = env_info["n_actions"]
     n_agents = env_info["n_agents"]
     steps_per_episode = env_info["episode_limit"]
-    print(env_info)
+
+    qmix = QMix(n_agents, state_dim, obs_dim, action_dim, args.capacity, steps_per_episode)
 
     for cur_episode in range(args.n_episodes):
         env.reset()
-        terminated = False
+        terminate = False
         step = 0  # record the length of this episode
         episode_reward = 0
         # save the trajectory of this episode
+        obs_list, state_list, action_list, avail_action_list, reward_list, terminate_list = [], [], [], [], [], []
 
-        while not terminated:
+        while not terminate:  # interact with the env for an episode
             obs = env.get_obs()
             state = env.get_state()
             # env.render()  # Uncomment for rendering
-            # print(obs)
-            # print(state)
 
             actions = []
+            avail_actions = []
             for agent_id in range(n_agents):
-                avail_actions = env.get_avail_agent_actions(agent_id)
-                avail_actions_ind = np.nonzero(avail_actions)[0]
-                action = np.random.choice(avail_actions_ind)
-                actions.append(action)
+                avail_act = env.get_avail_agent_actions(agent_id)
+                avail_actions.append(avail_act)
+                avail_actions_ind = np.nonzero(avail_act)[0]
+                actions.append(np.random.choice(avail_actions_ind))
 
-            reward, terminated, _ = env.step(actions)
+            reward, terminate, _ = env.step(actions)
+            # todo: record win info
             episode_reward += reward
             step += 1
+            # save experience
+            obs_list.append(obs)
+            state_list.append(state)
+            action_list.append(actions)
+            avail_action_list.append(avail_actions)
+            reward_list.append(reward)
+            terminate_list.append(terminate)
+
+        # after an episode finishes, we have to save the last data and then save them all
+        avail_actions = []
+        for agent_id in range(n_agents):
+            avail_actions.append(env.get_avail_agent_actions(agent_id))
+        obs_list.append(env.get_obs())
+        state_list.append(env.get_state())
+        avail_action_list.append(avail_actions)
+        qmix.buffer.add(obs_list, state_list, action_list, avail_action_list, reward_list, terminate_list)
 
         print(f"episode: {cur_episode + 1}, step: {step}, episode reward: {episode_reward}")
     env.close()

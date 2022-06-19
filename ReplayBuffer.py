@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 
 class ReplayBuffer:
@@ -43,7 +44,24 @@ class ReplayBuffer:
 
     def sample(self, batch_size):
         """sample experience from the buffer for learning"""
-        pass
+        # todo: test the behavior of this method
+        index = np.random.choice(range(self._size), size=batch_size, replace=False)  # without replacement
+        # get the max_episode_length of these episodes to filter out useless data
+        # Note that the sum of self.mask[i] indicates the length of episode i according to definition of mask
+        max_episode_length = max(sum(self.mask[i]) for i in index)
+
+        obs = torch.from_numpy(self.obs[index][:max_episode_length])
+        next_obs = torch.from_numpy(self.obs[index][1:max_episode_length + 1])
+        state = torch.from_numpy(self.state[index][:max_episode_length])
+        next_state = torch.from_numpy(self.state[index][1:max_episode_length + 1])
+        action = torch.from_numpy(self.action[index][:max_episode_length])
+        avail_action = torch.from_numpy(self.avail_action[index][:max_episode_length])
+        next_avail_action = torch.from_numpy(self.avail_action[index][1:max_episode_length + 1])
+        reward = torch.from_numpy(self.reward[index][:max_episode_length])
+        terminate = torch.from_numpy(self.terminate[index][:max_episode_length])
+        mask = torch.from_numpy(self.mask[index][:max_episode_length])
+
+        return obs, next_obs, state, next_state, action, avail_action, next_avail_action, reward, terminate, mask
 
     def __len__(self):
         return self._size

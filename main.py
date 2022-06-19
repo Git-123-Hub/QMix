@@ -41,16 +41,13 @@ if __name__ == '__main__':
         while not terminate:  # interact with the env for an episode
             obs = env.get_obs()
             state = env.get_state()
+            # record last action of each agent for choosing action
+            last_actions = np.zeros(n_agents, action_dim)
             # env.render()  # Uncomment for rendering
 
-            actions = []
-            avail_actions = []
-            for agent_id in range(n_agents):
-                avail_act = env.get_avail_agent_actions(agent_id)
-                avail_actions.append(avail_act)
-                avail_actions_ind = np.nonzero(avail_act)[0]
-                actions.append(np.random.choice(avail_actions_ind))
-
+            avail_actions = [env.get_avail_agent_actions(agent_id) for agent_id in range(n_agents)]
+            # todo: add args for epsilon
+            actions = qmix.choose_action(obs, last_actions, avail_actions, 0.1)
             reward, terminate, _ = env.step(actions)
             # todo: record win info
             episode_reward += reward
@@ -62,6 +59,8 @@ if __name__ == '__main__':
             avail_action_list.append(avail_actions)
             reward_list.append(reward)
             terminate_list.append(terminate)
+
+            last_actions = actions  # update last action
 
         # after an episode finishes, we have to save the last data and then save them all
         avail_actions = []

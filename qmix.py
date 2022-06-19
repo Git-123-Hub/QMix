@@ -11,7 +11,7 @@ class QMix:
         # use the same network, so an onehot vector is also used to distinguish different agent
         input_dim = obs_dim + n_agents + action_dim
         self.agent_net = AgentNet(3, input_dim, hidden_dim, action_dim)  # output q value for each action
-        self.mix_net = MixNet()  # todo: dimension info for mixing net
+        # self.mix_net = MixNet()  # todo: dimension info for mixing net
         self.buffer = ReplayBuffer(max_episode, n_agents, state_dim, obs_dim, action_dim, episode_limit)
         self.n_agents = n_agents
 
@@ -20,18 +20,18 @@ class QMix:
         choose action of an agent according to its id and observation
         """
         actions = []
-        for i, ob, last_action, avail_action in enumerate(zip(obs, last_actions, avail_actions)):
+        for i, (ob, last_action, avail_action) in enumerate(zip(obs, last_actions, avail_actions)):
             if np.random.uniform() < epsilon:
                 avail_actions_ind = np.nonzero(avail_action)[0]
                 actions.append(np.random.choice(avail_actions_ind))
                 continue
             agent_onehot = np.eye(self.n_agents)[i]
-            # todo: 观察数据维度，try torch.cat, write in one line
-            net_input = np.stack(obs, last_action, agent_onehot)
-            net_input = torch.from_numpy(net_input)
+            # todo: try torch.cat, write in one line
+            net_input = np.hstack((ob, last_action, agent_onehot))
+            net_input = torch.Tensor(net_input).unsqueeze(0)  # Torch.Size([1, input_dim])
             q_values = self.agent_net(net_input, i)
-            q_values[avail_action == 0.0] = - float("inf")  # unavailable actions can't be chosen
-            action = torch.argmax(q_values)
+            q_values[np.array(avail_action) == 0] = -float("inf")  # unavailable actions can't be chosen
+            action = torch.argmax(q_values).item()  # int
             actions.append(action)
         return actions
 

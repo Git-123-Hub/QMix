@@ -43,13 +43,13 @@ if __name__ == '__main__':
             obs = env.get_obs()
             state = env.get_state()
             # record last action of each agent for choosing action
-            last_actions = np.zeros(n_agents, action_dim)
+            last_actions = np.zeros((n_agents, action_dim))
             qmix.agent_net.init_hidden_state()  # init hidden state at the start of the episode
             # env.render()  # Uncomment for rendering
 
             avail_actions = [env.get_avail_agent_actions(agent_id) for agent_id in range(n_agents)]
             # todo: add args for epsilon
-            actions = qmix.choose_action(obs, last_actions, avail_actions, 0.1)
+            actions = qmix.choose_action(obs, last_actions, avail_actions, 0)
             reward, terminate, _ = env.step(actions)
             # todo: record win info
             episode_reward += reward

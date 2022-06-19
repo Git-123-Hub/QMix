@@ -36,15 +36,14 @@ class AgentNet(Net):
 
     def init_hidden_state(self):
         # todo: check data dimension
-        self.hidden_state = torch.zeros((self.n_agents, self.hidden_dim))
+        # hidden state shape[1, hidden_dim] for each agent
+        self.hidden_state = torch.zeros((self.n_agents, 1, self.hidden_dim))
 
     def forward(self, state, agent_i):
         x = F.relu(self.fc1(state))
-        # self.hidden_state = self.hidden_state.reshape(-1, self.args.rnn_hidden_dim)
-        # todo: change dimension for hidden state
         self.hidden_state[agent_i] = self.rnn(x, self.hidden_state[agent_i])
-        q = self.fc2(self.hidden_state)
-        return q, self.hidden_state
+        q = self.fc2(self.hidden_state[agent_i]).squeeze(0)  # Torch.size([action_dim])
+        return q
 
 
 class MixNet(Net):

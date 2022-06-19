@@ -50,16 +50,16 @@ class ReplayBuffer:
         # Note that the sum of self.mask[i] indicates the length of episode i according to definition of mask
         max_episode_length = max(sum(self.mask[i]) for i in index)
 
-        obs = torch.from_numpy(self.obs[index][:max_episode_length])
-        next_obs = torch.from_numpy(self.obs[index][1:max_episode_length + 1])
-        state = torch.from_numpy(self.state[index][:max_episode_length])
-        next_state = torch.from_numpy(self.state[index][1:max_episode_length + 1])
-        action = torch.from_numpy(self.action[index][:max_episode_length])
-        avail_action = torch.from_numpy(self.avail_action[index][:max_episode_length])
-        next_avail_action = torch.from_numpy(self.avail_action[index][1:max_episode_length + 1])
-        reward = torch.from_numpy(self.reward[index][:max_episode_length])
-        terminate = torch.from_numpy(self.terminate[index][:max_episode_length])
-        mask = torch.from_numpy(self.mask[index][:max_episode_length])
+        obs = torch.Tensor(self.obs[index][:max_episode_length])
+        next_obs = torch.Tensor(self.obs[index][1:max_episode_length + 1])
+        state = torch.Tensor(self.state[index][:max_episode_length])
+        next_state = torch.Tensor(self.state[index][1:max_episode_length + 1])
+        action = torch.Tensor(self.action[index][:max_episode_length])
+        avail_action = torch.Tensor(self.avail_action[index][:max_episode_length])
+        next_avail_action = torch.Tensor(self.avail_action[index][1:max_episode_length + 1])
+        reward = torch.Tensor(self.reward[index][:max_episode_length])
+        terminate = torch.Tensor(self.terminate[index][:max_episode_length])
+        mask = torch.Tensor(self.mask[index][:max_episode_length])
 
         return obs, next_obs, state, next_state, action, avail_action, next_avail_action, reward, terminate, mask
 

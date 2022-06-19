@@ -17,6 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('--capacity', type=int, default=5e3, help='maximum number of episode in buffer')
     parser.add_argument('--batch_size', type=int, default=100,
                         help='number of episode sampled each time from buffer')
+    parser.add_argument('--hidden_dim', type=int, default=64, help='hidden dimension for rnn')
 
     args = parser.parse_args()
 
@@ -28,7 +29,7 @@ if __name__ == '__main__':
     n_agents = env_info["n_agents"]
     steps_per_episode = env_info["episode_limit"]
 
-    qmix = QMix(n_agents, state_dim, obs_dim, action_dim, args.capacity, steps_per_episode)
+    qmix = QMix(n_agents, state_dim, obs_dim, action_dim, args.capacity, steps_per_episode, args.hidden_dim)
 
     for cur_episode in range(args.n_episodes):
         env.reset()
@@ -43,6 +44,7 @@ if __name__ == '__main__':
             state = env.get_state()
             # record last action of each agent for choosing action
             last_actions = np.zeros(n_agents, action_dim)
+            qmix.agent_net.init_hidden_state()  # init hidden state at the start of the episode
             # env.render()  # Uncomment for rendering
 
             avail_actions = [env.get_avail_agent_actions(agent_id) for agent_id in range(n_agents)]
@@ -70,6 +72,7 @@ if __name__ == '__main__':
         state_list.append(env.get_state())
         avail_action_list.append(avail_actions)
         qmix.buffer.add(obs_list, state_list, action_list, avail_action_list, reward_list, terminate_list)
+        qmix.learn(args.batch_size)
 
         print(f"episode: {cur_episode + 1}, step: {step}, episode reward: {episode_reward}")
     env.close()

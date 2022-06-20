@@ -11,9 +11,11 @@ class ReplayBuffer:
         # then we mix them up using `next_state` to get q_target_total.
         # In summary, we need to record the data of `obs`, `state`, `avail_action` of the `next` timestep
         # thus the length of `obs`, `state`, `avail_action` is 1 more than others
+        # todo: remove next
         self.obs = np.zeros([max_episode, episode_limit + 1, n_agents, obs_dim])
         self.state = np.zeros([max_episode, episode_limit + 1, state_dim])
-        self.action = np.zeros([max_episode, episode_limit, n_agents, action_dim])
+        self.action = np.zeros([max_episode, episode_limit, n_agents])  # int
+        self.action_onehot = np.zeros([max_episode, episode_limit, n_agents, action_dim])
         self.avail_action = np.zeros([max_episode, episode_limit + 1, n_agents, action_dim])
         self.reward = np.zeros([max_episode, episode_limit])
         self.terminate = np.zeros([max_episode, episode_limit])
@@ -27,12 +29,13 @@ class ReplayBuffer:
         episode_length = len(terminate_list)
         self.obs[self._index][:episode_length + 1] = np.array(obs_list[:])
         self.state[self._index][:episode_length + 1] = np.array(state_list[:])
+        self.action[self._index][:episode_length] = np.array(action_list[:])
         # todo: a better way of getting onehot action vector
         # action_list is a list of int, meaning the index of the action
         # we get onehot vector by setting corresponding value to 1
         for step in range(episode_length):
             for agent_num, act in enumerate(action_list[step]):
-                self.action[self._index][step][agent_num][act] = 1
+                self.action_onehot[self._index][step][agent_num][act] = 1
         self.avail_action[self._index][:episode_length + 1] = np.array(avail_action_list[:])
         self.reward[self._index][:episode_length] = np.array(reward_list)
         self.terminate[self._index][:episode_length] = np.array(terminate_list)
@@ -48,20 +51,22 @@ class ReplayBuffer:
         index = np.random.choice(range(self._size), size=batch_size, replace=False)  # without replacement
         # get the max_episode_length of these episodes to filter out useless data
         # Note that the sum of self.mask[i] indicates the length of episode i according to definition of mask
-        max_episode_length = max(sum(self.mask[i]) for i in index)
+        max_episode_length = int(max(sum(self.mask[i]) for i in index))
 
-        obs = torch.Tensor(self.obs[index][:max_episode_length])
-        next_obs = torch.Tensor(self.obs[index][1:max_episode_length + 1])
-        state = torch.Tensor(self.state[index][:max_episode_length])
-        next_state = torch.Tensor(self.state[index][1:max_episode_length + 1])
-        action = torch.Tensor(self.action[index][:max_episode_length])
-        avail_action = torch.Tensor(self.avail_action[index][:max_episode_length])
-        next_avail_action = torch.Tensor(self.avail_action[index][1:max_episode_length + 1])
-        reward = torch.Tensor(self.reward[index][:max_episode_length])
-        terminate = torch.Tensor(self.terminate[index][:max_episode_length])
-        mask = torch.Tensor(self.mask[index][:max_episode_length])
+        obs = torch.Tensor(self.obs[index][:, :max_episode_length])
+        next_obs = torch.Tensor(self.obs[index][:, 1:max_episode_length + 1])
+        state = torch.Tensor(self.state[index][:, :max_episode_length])
+        next_state = torch.Tensor(self.state[index][:, 1:max_episode_length + 1])
+        action = torch.tensor(self.action[index][:, :max_episode_length], dtype=torch.int64)  # action is int
+        action_onehot = torch.Tensor(self.action_onehot[index][:, :max_episode_length])
+        avail_action = torch.Tensor(self.avail_action[index][:, :max_episode_length])
+        next_avail_action = torch.Tensor(self.avail_action[index][:, 1:max_episode_length + 1])
+        reward = torch.Tensor(self.reward[index][:, :max_episode_length])
+        terminate = torch.Tensor(self.terminate[index][:, :max_episode_length])
+        mask = torch.Tensor(self.mask[index][:, :max_episode_length])
 
-        return obs, next_obs, state, next_state, action, avail_action, next_avail_action, reward, terminate, mask
+        return obs, next_obs, state, next_state, action, action_onehot, avail_action, next_avail_action, \
+               reward, terminate, mask
 
     def __len__(self):
         return self._size

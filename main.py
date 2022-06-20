@@ -72,7 +72,8 @@ if __name__ == '__main__':
         state_list.append(env.get_state())
         avail_action_list.append(avail_actions)
         qmix.buffer.add(obs_list, state_list, action_list, avail_action_list, reward_list, terminate_list)
-        qmix.learn(args.batch_size)
+        # todo: add args discount factor
+        qmix.learn(args.batch_size, 0.99)
 
         print(f"episode: {cur_episode + 1}, step: {step}, episode reward: {episode_reward}")
     env.close()

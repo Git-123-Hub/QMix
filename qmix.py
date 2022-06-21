@@ -6,19 +6,23 @@ from ReplayBuffer import ReplayBuffer
 
 
 class QMix:
-    def __init__(self, n_agents, state_dim, obs_dim, action_dim, max_episode, episode_limit, hidden_dim):
+    def __init__(self, env_info, max_episode, rnn_hidden_dim, mix_hidden_dim, lr):
+        state_dim = env_info["state_shape"]
+        obs_dim = env_info["obs_shape"]
+        action_dim = env_info["n_actions"]
+        n_agents = env_info["n_agents"]
+        episode_limit = env_info["episode_limit"]
         # agent network take `obs` and `last action` as input, besides all the agents
         # use the same network, so an onehot vector is also used to distinguish different agent
         input_dim = obs_dim + n_agents + action_dim
-        self.agent_net = AgentNet(n_agents, input_dim, hidden_dim, action_dim)
-        self.target_agent_net = AgentNet(n_agents, input_dim, hidden_dim, action_dim)
-        self.mix_net = MixNet(state_dim, 32, 3)  # todo: dimension info for mixing net
-        self.target_mix_net = MixNet(state_dim, 32, 3)  # todo: mixnet_hidden_dim
+        self.agent_net = AgentNet(n_agents, input_dim, rnn_hidden_dim, action_dim)
+        self.target_agent_net = AgentNet(n_agents, input_dim, rnn_hidden_dim, action_dim)
+        self.mix_net = MixNet(state_dim, mix_hidden_dim, n_agents)
+        self.target_mix_net = MixNet(state_dim, mix_hidden_dim, n_agents)
         self.buffer = ReplayBuffer(max_episode, n_agents, state_dim, obs_dim, action_dim, episode_limit)
         self.n_agents = n_agents
         self.parameters = list(self.agent_net.parameters()) + list(self.mix_net.parameters())
-        self.optimizer = torch.optim.RMSprop(self.parameters, lr=5e-4)
-        # todo: add args for learning-rate
+        self.optimizer = torch.optim.RMSprop(self.parameters, lr=lr)
 
     def choose_action(self, obs, last_actions, avail_actions, epsilon):
         """
@@ -40,8 +44,7 @@ class QMix:
             actions.append(action)
         return actions
 
-    def learn(self, batch_size, gamma):
-        # batch_size = 1  # todo: delete this
+    def learn(self, batch_size, gamma, clip_gard_norm):
         if len(self.buffer) < batch_size:  # only start to learn when there are enough experience to sample
             # todo: try learn every step
             return
@@ -94,6 +97,5 @@ class QMix:
         loss = (td_error ** 2).sum() / mask.sum()
         self.optimizer.zero_grad()
         loss.backward()
-        # todo: add args for clip_grad_norm
-        torch.nn.utils.clip_grad_norm_(self.parameters, 10)
+        torch.nn.utils.clip_grad_norm_(self.parameters, clip_gard_norm)
         self.optimizer.step()

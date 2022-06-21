@@ -16,13 +16,18 @@ if __name__ == '__main__':
                                  '2c_vs_64zg', ])
     parser.add_argument('--n_episodes', type=int, default=10000, help='total episode num of training process')
     parser.add_argument('--capacity', type=int, default=5e3, help='maximum number of episode in buffer')
-    parser.add_argument('--batch_size', type=int, default=100,
+    parser.add_argument('--batch_size', type=int, default=32,
                         help='number of episode sampled each time from buffer')
-    parser.add_argument('--hidden_dim', type=int, default=64, help='hidden dimension for rnn')
+    parser.add_argument('--rnn_hidden_dim', type=int, default=64, help='hidden dimension for rnn')
+    parser.add_argument('--mix_hidden_dim', type=int, default=32, help='hidden dimension for mix net')
+    parser.add_argument('--lr', type=float, default=5e-4, help='learning rate')
+    parser.add_argument('--gamma', type=float, default=0.99, help='discount factor')
+    parser.add_argument('--clip_grad_norm', type=float, default=10, help='discount factor')
+    parser.add_argument('--step_mul', type=int, default=8, help='How many game steps per agent step')
 
     args = parser.parse_args()
 
-    env = StarCraft2Env(map_name=args.map)
+    env = StarCraft2Env(map_name=args.map, step_mul=args.step_mul)
     env_info = env.get_env_info()
     state_dim = env_info["state_shape"]
     obs_dim = env_info["obs_shape"]
@@ -30,7 +35,7 @@ if __name__ == '__main__':
     n_agents = env_info["n_agents"]
     steps_per_episode = env_info["episode_limit"]
 
-    qmix = QMix(n_agents, state_dim, obs_dim, action_dim, args.capacity, steps_per_episode, args.hidden_dim)
+    qmix = QMix(env_info, args.capacity, args.rnn_hidden_dim, args.mix_hidden_dim, args.lr)
     all_rewards = np.zeros(args.n_episodes)
 
     for cur_episode in range(args.n_episodes):
@@ -78,8 +83,7 @@ if __name__ == '__main__':
         state_list.append(env.get_state())
         avail_action_list.append(avail_actions)
         qmix.buffer.add(obs_list, state_list, action_list, avail_action_list, reward_list, terminate_list)
-        # todo: add args discount factor
-        qmix.learn(args.batch_size, 0.99)
+        qmix.learn(args.batch_size, args.gamma, args.clip_grad_norm)
 
     env.close()
 

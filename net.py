@@ -34,10 +34,10 @@ class AgentNet(Net):
         self.n_agents = n_agents
         self.hidden_dim = hidden_dim
 
-    def init_hidden_state(self):
+    def init_hidden_state(self, episode_num):
         # todo: check data dimension
         # hidden state shape[1, hidden_dim] for each agent
-        self.hidden_state = torch.zeros((self.n_agents, 1, self.hidden_dim))
+        self.hidden_state = torch.zeros((self.n_agents, episode_num, self.hidden_dim))
 
     def _get_q_value(self, obs, agent_i):
         """
@@ -45,8 +45,10 @@ class AgentNet(Net):
         meaning the q value of each action
         """
         x = F.relu(self.fc1(obs))
-        self.hidden_state[agent_i] = self.rnn(x, self.hidden_state[agent_i])
-        q = self.fc2(self.hidden_state[agent_i])
+        hidden = self.hidden_state[agent_i].clone()
+        hidden = self.rnn(x, hidden)
+        q = self.fc2(hidden)
+        self.hidden_state[agent_i] = hidden
         return q
 
     def forward(self, obs, agent_i=None):

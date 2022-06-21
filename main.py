@@ -1,6 +1,7 @@
 import argparse
 
 import numpy as np
+from matplotlib import pyplot as plt
 from smac.env import StarCraft2Env
 
 from qmix import QMix
@@ -13,7 +14,7 @@ if __name__ == '__main__':
                                  '3s_vs_5z', '1c3s5z', '2m_vs_1z',
                                  'corridor', '6h_vs_8z', '2s_vs_1sc', 'so_many_baneling', 'bane_vs_bane',
                                  '2c_vs_64zg', ])
-    parser.add_argument('--n_episodes', type=int, default=10, help='total episode num of training process')
+    parser.add_argument('--n_episodes', type=int, default=10000, help='total episode num of training process')
     parser.add_argument('--capacity', type=int, default=5e3, help='maximum number of episode in buffer')
     parser.add_argument('--batch_size', type=int, default=100,
                         help='number of episode sampled each time from buffer')
@@ -30,6 +31,7 @@ if __name__ == '__main__':
     steps_per_episode = env_info["episode_limit"]
 
     qmix = QMix(n_agents, state_dim, obs_dim, action_dim, args.capacity, steps_per_episode, args.hidden_dim)
+    all_rewards = np.zeros(args.n_episodes)
 
     for cur_episode in range(args.n_episodes):
         env.reset()
@@ -44,12 +46,12 @@ if __name__ == '__main__':
             state = env.get_state()
             # record last action of each agent for choosing action
             last_actions = np.zeros((n_agents, action_dim))
-            qmix.agent_net.init_hidden_state()  # init hidden state at the start of the episode
+            qmix.agent_net.init_hidden_state(1)  # init hidden state at the start of the episode
             # env.render()  # Uncomment for rendering
 
             avail_actions = [env.get_avail_agent_actions(agent_id) for agent_id in range(n_agents)]
             # todo: add args for epsilon
-            actions = qmix.choose_action(obs, last_actions, avail_actions, 0)
+            actions = qmix.choose_action(obs, last_actions, avail_actions, 0.3)
             reward, terminate, _ = env.step(actions)
             # todo: record win info
             episode_reward += reward
@@ -64,7 +66,11 @@ if __name__ == '__main__':
 
             last_actions = actions  # update last action
 
-        # after an episode finishes, we have to save the last data and then save them all
+        # episode finishes
+        print(f"episode: {cur_episode + 1}, step: {step}, episode reward: {episode_reward}")
+        all_rewards[cur_episode] = episode_reward
+
+        # we have to save the last data and then save them all
         avail_actions = []
         for agent_id in range(n_agents):
             avail_actions.append(env.get_avail_agent_actions(agent_id))
@@ -75,5 +81,14 @@ if __name__ == '__main__':
         # todo: add args discount factor
         qmix.learn(args.batch_size, 0.99)
 
-        print(f"episode: {cur_episode + 1}, step: {step}, episode reward: {episode_reward}")
     env.close()
+
+    # plot result
+    fig, ax = plt.subplots()
+    x = range(1, args.n_episodes + 1)
+    ax.plot(x, all_rewards)
+    ax.set_xlabel('episode')
+    ax.set_ylabel('reward')
+    title = f'training result of {args.map}'
+    ax.set_title(title)
+    plt.savefig(title)

@@ -41,7 +41,7 @@ class QMix:
         return actions
 
     def learn(self, batch_size, gamma):
-        batch_size = 1  # todo: delete this
+        # batch_size = 1  # todo: delete this
         if len(self.buffer) < batch_size:  # only start to learn when there are enough experience to sample
             # todo: try learn every step
             return
@@ -49,12 +49,14 @@ class QMix:
         # todo: add parameter learn_epoch, save_interval, train_interval
         obs, next_obs, state, next_state, action, action_onehot, avail_action, next_avail_action, reward, \
         terminate, mask = self.buffer.sample(batch_size)
-        # there are `batch_size` episodes of experience sampled, we need to calculate q value of each step
-        self.target_agent_net.init_hidden_state()  # todo: the shape of init hidden
+        # NOTE that `batch_size` is the episode num of sampled experience
+        self.agent_net.init_hidden_state(batch_size)  # todo: the shape of init hidden
+        self.target_agent_net.init_hidden_state(batch_size)  # todo: the shape of init hidden
         max_episode_length = obs.shape[1]  # obs shape: Torch.Size([episode, step, agent, obs_dim])
         # q_values = torch.zeros((batch_size, max_episode_length, self.n_agents))
         # target_q_values = torch.zeros_like(q_values)
 
+        # we need to calculate q value of each step
         q_values_list = []
         target_q_values_list = []
         for step in range(max_episode_length):  # calculate q value of each step
@@ -65,7 +67,7 @@ class QMix:
                 last_action = torch.zeros_like(act)
             else:
                 last_action = action_onehot[:, step - 1]
-            agent_onehot = torch.eye(self.n_agents).unsqueeze(0)
+            agent_onehot = torch.eye(self.n_agents).unsqueeze(0).expand(batch_size, -1, -1)
 
             net_input = torch.cat([ob, last_action, agent_onehot], dim=2)
             target_net_input = torch.cat([next_ob, act, agent_onehot], dim=2)

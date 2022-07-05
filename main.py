@@ -24,8 +24,12 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.99, help='discount factor')
     parser.add_argument('--clip_grad_norm', type=float, default=10, help='discount factor')
     parser.add_argument('--step_mul', type=int, default=8, help='How many game steps per agent step')
+    parser.add_argument('--epsilon', type=float, default=1)
+    parser.add_argument('--mini_epsilon', type=float, default=0.05)
+    parser.add_argument('--epsilon_anneal_step', type=int, default=60 * 8000)
 
     args = parser.parse_args()
+    epsilon_anneal = (args.epsilon - args.mini_epsilon) / args.epsilon_anneal_step
 
     env = StarCraft2Env(map_name=args.map, step_mul=args.step_mul)
     env_info = env.get_env_info()
@@ -41,6 +45,7 @@ if __name__ == '__main__':
     for cur_episode in range(args.n_episodes):
         env.reset()
         terminate = False
+        win = False
         step = 0  # record the length of this episode
         episode_reward = 0
         # save the trajectory of this episode
@@ -55,9 +60,10 @@ if __name__ == '__main__':
             # env.render()  # Uncomment for rendering
 
             avail_actions = [env.get_avail_agent_actions(agent_id) for agent_id in range(n_agents)]
-            # todo: add args for epsilon
-            actions = qmix.choose_action(obs, last_actions, avail_actions, 0.3)
-            reward, terminate, _ = env.step(actions)
+            actions = qmix.choose_action(obs, last_actions, avail_actions, args.epsilon)
+            reward, terminate, info = env.step(actions)
+            if 'battle_won' in info and info['battle_won'] is True:
+                win = True
             # todo: record win info
             episode_reward += reward
             step += 1
@@ -70,9 +76,11 @@ if __name__ == '__main__':
             terminate_list.append(terminate)
 
             last_actions = actions  # update last action
+            if args.epsilon > args.mini_epsilon:  # anneal epsilon
+                args.epsilon -= epsilon_anneal
 
         # episode finishes
-        print(f"episode: {cur_episode + 1}, step: {step}, episode reward: {episode_reward}")
+        print(f"episode: {cur_episode + 1}, step: {step}, episode reward: {episode_reward}, epsilon: {args.epsilon}, {win}")
         all_rewards[cur_episode] = episode_reward
 
         # we have to save the last data and then save them all
